@@ -1,0 +1,116 @@
+{
+  "label": "label_touch",
+  "threshold_pct": 5.0,
+  "horizon": 5,
+  "embargo_days": 5,
+  "rows_total": 1795289,
+  "rows_test": 507810,
+  "base_rate_full": 0.3484,
+  "base_rate_test": 0.3323,
+  "roc_auc": 0.6603,
+  "pr_auc": 0.477,
+  "brier": 0.20726,
+  "top_decile_prob_cutoff": 0.5383,
+  "decile_table": [
+    {
+      "bucket": 0,
+      "n": 54554,
+      "avg_prob": 0.1272,
+      "hit_rate": 0.1276,
+      "lift": 0.384,
+      "mean_ret5": -0.159,
+      "net_ret5": -0.439,
+      "mean_mfe5": 2.458
+    },
+    {
+      "bucket": 1,
+      "n": 52171,
+      "avg_prob": 0.2125,
+      "hit_rate": 0.2039,
+      "lift": 0.614,
+      "mean_ret5": -0.234,
+      "net_ret5": -0.514,
+      "mean_mfe5": 3.218
+    },
+    {
+      "bucket": 2,
+      "n": 55135,
+      "avg_prob": 0.2736,
+      "hit_rate": 0.2441,
+      "lift": 0.734,
+      "mean_ret5": -0.251,
+      "net_ret5": -0.531,
+      "mean_mfe5": 3.62
+    },
+    {
+      "bucket": 3,
+      "n": 41614,
+      "avg_prob": 0.3094,
+      "hit_rate": 0.2827,
+      "lift": 0.851,
+      "mean_ret5": -0.135,
+      "net_ret5": -0.415,
+      "mean_mfe5": 4.006
+    },
+    {
+      "bucket": 4,
+      "n": 59957,
+      "avg_prob": 0.3439,
+      "hit_rate": 0.3175,
+      "lift": 0.956,
+      "mean_ret5": -0.071,
+      "net_ret5": -0.351,
+      "mean_mfe5": 4.345
+    },
+    {
+      "bucket": 5,
+      "n": 60312,
+      "avg_prob": 0.3963,
+      "hit_rate": 0.3566,
+      "lift": 1.073,
+      "mean_ret5": 0.107,
+      "net_ret5": -0.173,
+      "mean_mfe5": 4.805
+    },
+    {
+      "bucket": 6,
+      "n": 36293,
+      "avg_prob": 0.4297,
+      "hit_rate": 0.3873,
+      "lift": 1.166,
+      "mean_ret5": 0.285,
+      "net_ret5": 0.005,
+      "mean_mfe5": 5.164
+    },
+    {
+      "bucket": 7,
+      "n": 59645,
+      "avg_prob": 0.4664,
+      "hit_rate": 0.4218,
+      "lift": 1.269,
+      "mean_ret5": 0.427,
+      "net_ret5": 0.147,
+      "mean_mfe5": 5.565
+    },
+    {
+      "bucket": 8,
+      "n": 37481,
+      "avg_prob": 0.5245,
+      "hit_rate": 0.4634,
+      "lift": 1.394,
+      "mean_ret5": 0.793,
+      "net_ret5": 0.513,
+      "mean_mfe5": 6.13
+    },
+    {
+      "bucket": 9,
+      "n": 50648,
+      "avg_prob": 0.6246,
+      "hit_rate": 0.5685,
+      "lift": 1.711,
+      "mean_ret5": 1.697,
+      "net_ret5": 1.417,
+      "mean_mfe5": 7.483
+    }
+  ]
+}
