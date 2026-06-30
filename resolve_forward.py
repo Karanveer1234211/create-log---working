@@ -141,33 +141,75 @@ else:
     print("(need >=5 resolved trades before the scorecard prints -- keep running.)")
 
 # ---- your actual trades vs the system ----
-taken_path = os.path.join(args.out, "taken_trades.csv")
-if os.path.exists(taken_path) and len(done):
+# look in <out>/taken_trades.csv AND <out>/Trade log/taken_trades.csv (where log_trade.py writes)
+taken_candidates = [os.path.join(args.out, "taken_trades.csv"),
+                    os.path.join(args.out, "Trade log", "taken_trades.csv")]
+taken_path = next((p for p in taken_candidates if os.path.exists(p)), None)
+
+def resolve_from_entry(sym, entry_dt):
+    """Resolve the system's H-session window anchored to the user's ACTUAL entry date
+    (not the watchlist date) -- entry = that day's open, exit = H-th session close."""
+    g = by_sym.get(sym)
+    if g is None or pd.isna(entry_dt):
+        return None
+    pos = g.index[g["_day"] == pd.Timestamp(entry_dt)]
+    if len(pos) == 0:
+        return None
+    i = int(pos[0]); fut = g.iloc[i: i + H]          # entry day IS day-1 here (user already in)
+    if len(fut) < H:
+        return None
+    e = float(fut["open"].iloc[0])
+    if not np.isfinite(e) or e <= 0:
+        return None
+    c5 = float(fut["close"].iloc[-1]); hi = float(fut["high"].max()); lo = float(fut["low"].min())
+    return dict(entry_open=e, close_d5=c5, ret_5=c5/e - 1.0, mfe_5=hi/e - 1.0, mae_5=lo/e - 1.0)
+
+if taken_path:
     tk = pd.read_csv(taken_path)
-    rr = done[[SYM, "date", "entry_open", "close_d5", "ret_5", "mae_5", "mfe_5"]].copy()
-    rr["_d"] = mkdate(rr["date"]); rr = rr.drop(columns=["date"])
-    tk["_d"] = mkdate(tk["log_date"])
-    j = tk.merge(rr, on=[SYM, "_d"], how="left")
-    j["sys_5d_pct"] = j["ret_5"] * 100.0
-    j["hold_from_my_entry_pct"] = (j["close_d5"] / j["entry_price"] - 1.0) * 100.0
-    is_exit = j["exit_price"].notna() & j["close_d5"].notna()
-    j["variance_pct"] = np.where(is_exit, (j["close_d5"] / j["exit_price"] - 1.0) * 100.0, np.nan)
-    has_qty = is_exit & j["qty"].notna()
-    j["variance_abs"] = np.where(has_qty, (j["close_d5"] - j["exit_price"]) * j["qty"], np.nan)
+    print(f"\n=== YOUR TRADES vs SYSTEM ===  (taken_trades.csv @ {os.path.dirname(taken_path) or '.'})")
+    # anchor on the user's real entry_date (falls back to log_date if absent)
+    date_key = "entry_date" if "entry_date" in tk.columns else "log_date"
+    tk["entrykey"] = mkdate(tk[date_key])
+    recs = []
+    for r in tk.itertuples(index=False):
+        d = r._asdict(); sysr = resolve_from_entry(d.get(SYM), d.get("entrykey"))
+        if sysr:
+            d["sys_close_d5"] = round(sysr["close_d5"], 4)
+            d["sys_5d_pct"] = round(sysr["ret_5"] * 100.0, 3)
+            d["sys_mae_5"] = round(sysr["mae_5"] * 100.0, 3)
+            d["sys_mfe_5"] = round(sysr["mfe_5"] * 100.0, 3)
+            ep = d.get("entry_price"); xp = d.get("exit_price"); q = d.get("qty")
+            d["hold_from_my_entry_pct"] = round((sysr["close_d5"]/float(ep) - 1.0)*100.0, 3) \
+                if pd.notna(ep) and float(ep) > 0 else np.nan
+            if pd.notna(xp) and float(xp) > 0:
+                d["variance_pct"] = round((sysr["close_d5"]/float(xp) - 1.0)*100.0, 3)
+                d["variance_abs"] = round((sysr["close_d5"] - float(xp)) * float(q), 2) \
+                    if pd.notna(q) else np.nan
+            else:
+                d["variance_pct"] = np.nan; d["variance_abs"] = np.nan
+            d["sys_resolved"] = True
+        else:
+            for c in ["sys_close_d5","sys_5d_pct","sys_mae_5","sys_mfe_5",
+                      "hold_from_my_entry_pct","variance_pct","variance_abs"]:
+                d[c] = np.nan
+            d["sys_resolved"] = False
+        recs.append(d)
+    j = pd.DataFrame(recs).drop(columns=["entrykey"], errors="ignore")
     j.to_csv(os.path.join(args.out, "taken_trades_resolved.csv"), index=False)
 
-    matured = j[j["close_d5"].notna()]
-    ex = matured[matured["exit_price"].notna()]
-    print("\n=== YOUR TRADES vs SYSTEM ===")
-    print(f"  logged {len(j)} | matured {len(matured)} | exited & matured {len(ex)}")
+    matured = j[j["sys_resolved"] == True]
+    ex = matured[matured["exit_price"].notna()] if "exit_price" in matured.columns else matured.iloc[0:0]
+    print(f"  logged {len(j)} | system-resolved {len(matured)} | exited & resolved {len(ex)}")
     if len(ex):
-        print(f"  your realized exit : mean {ex['realized_pnl_pct'].mean():+6.2f}%")
-        print(f"  % change to day 5  : mean {ex['sys_5d_pct'].mean():+6.2f}%   (next-open -> day5 close)")
-        print(f"  early-exit variance: mean {ex['variance_pct'].mean():+6.2f}%   "
-              f"total Rs {np.nansum(ex['variance_abs']):+,.0f}")
-        print("  Read: +variance = money left on the table by exiting early; -variance = drawdown dodged.")
-        print("        Watch the SIGN over many trades -- that's whether your early exits help or hurt.")
+        rp = pd.to_numeric(ex.get("realized_pnl_pct"), errors="coerce")
+        print(f"  your realized exit  : mean {rp.mean():+6.2f}%")
+        print(f"  system to day-5     : mean {ex['sys_5d_pct'].mean():+6.2f}%   (your entry -> 5th session close)")
+        print(f"  early-exit variance : mean {ex['variance_pct'].mean():+6.2f}%   "
+              f"total Rs {np.nansum(pd.to_numeric(ex['variance_abs'], errors='coerce')):+,.0f}")
+        print("  Read: +variance = money left on the table by exiting early; - = drawdown dodged.")
+        print("        Watch the SIGN over many trades -- whether your early exits help or hurt.")
+    else:
+        print("  (no exited trades have matured 5 sessions yet -- variance fills in as they age.)")
     print("  wrote taken_trades_resolved.csv")
-elif os.path.exists(taken_path):
-    print("\n(taken_trades.csv found, but no picks have matured yet -- your trades resolve here "
-          "once their 5-day window elapses.)")
+else:
+    print("\n(no taken_trades.csv found in <out> or <out>/Trade log -- log trades with log_trade.py first.)")
